@@ -1,87 +1,69 @@
+from flask import Flask, request, jsonify
+import json
 import os
-import requests
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import Flow
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
-from flask import Flask, request, redirect, session, url_for
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "a_random_secret_key")
 
+# Google Calendar API scope
 SCOPES = ['https://www.googleapis.com/auth/calendar.events']
-REDIRECT_URI = "https://jouw-redirect-url.com/callback"  # Pas dit aan naar jouw URL
 
-# Start OAuth autorisatieproces
-@app.route('/authorize')
-def authorize():
-    flow = Flow.from_client_secrets_file(
-        'client_secret.json',
-        scopes=SCOPES,
-        redirect_uri=REDIRECT_URI
-    )
-    
-    authorization_url, state = flow.authorization_url(
-        access_type='offline',
-        include_granted_scopes='true'
-    )
+# Function to get Google credentials
+def get_credentials():
+    creds = None
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                'client_secret.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
+    return creds
 
-    session['state'] = state
-    return redirect(authorization_url)
-
-# OAuth callback endpoint
-@app.route('/callback')
-def oauth2callback():
-    state = session['state']
-    
-    flow = Flow.from_client_secrets_file(
-        'client_secret.json',
-        scopes=SCOPES,
-        state=state,
-        redirect_uri=REDIRECT_URI
-    )
-
-    authorization_response = request.url
-    flow.fetch_token(authorization_response=authorization_response)
-
-    credentials = flow.credentials
-    session['credentials'] = credentials_to_dict(credentials)
-
-    return redirect(url_for('calendar_event'))
-
-# Functie om een Google Calendar event in te plannen
-@app.route('/calendar_event')
-def calendar_event():
-    if 'credentials' not in session:
-        return redirect('authorize')
-
-    credentials = Credentials(**session['credentials'])
+# Function to create a Google Calendar event
+def create_google_calendar_event(start_datetime, end_datetime, summary, timezone="Europe/Amsterdam"):
+    credentials = get_credentials()
     service = build('calendar', 'v3', credentials=credentials)
 
     event = {
-        'summary': 'Test Event',
+        'summary': summary,
         'start': {
-            'dateTime': '2024-09-26T09:00:00',
-            'timeZone': 'Europe/Amsterdam',
+            'dateTime': start_datetime,
+            'timeZone': timezone,
         },
         'end': {
-            'dateTime': '2024-09-26T09:30:00',
-            'timeZone': 'Europe/Amsterdam',
+            'dateTime': end_datetime,
+            'timeZone': timezone,
         }
     }
 
     event_result = service.events().insert(calendarId='primary', body=event).execute()
+    return event_result['htmlLink']
 
-    return f"Event created: {event_result.get('htmlLink')}"
-
-def credentials_to_dict(credentials):
-    return {
-        'token': credentials.token,
-        'refresh_token': credentials.refresh_token,
-        'token_uri': credentials.token_uri,
-        'client_id': credentials.client_id,
-        'client_secret': credentials.client_secret,
-        'scopes': credentials.scopes
-    }
+# Route to handle scheduling requests
+@app.route('/schedule', methods=['POST'])
+def schedule_event():
+    try:
+        data = request.json  # Get JSON payload from POST request
+        start_datetime = data['start']['dateTime']
+        end_datetime = data['end']['dateTime']
+        summary = data['summary']
+        timezone = data['start'].get('timeZone', 'Europe/Amsterdam')
+        
+        # Create event in Google Calendar
+        event_link = create_google_calendar_event(start_datetime, end_datetime, summary, timezone)
+        
+        # Return success response
+        return jsonify({"message": "Event created successfully", "event_link": event_link}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000)
