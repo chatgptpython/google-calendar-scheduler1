@@ -6,27 +6,13 @@ from googleapiclient.discovery import build
 # Google Calendar API scope
 SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 
-# Functie om de service account credentials te laden vanuit omgevingsvariabelen
+# Load credentials from the environment variable
 def get_credentials():
-    service_account_info = {
-        "type": os.getenv('GOOGLE_TYPE'),
-        "project_id": os.getenv('GOOGLE_PROJECT_ID'),
-        "private_key_id": os.getenv('GOOGLE_PRIVATE_KEY_ID'),
-        "private_key": os.getenv('GOOGLE_PRIVATE_KEY').replace('\\n', '\n'),
-        "client_email": os.getenv('GOOGLE_CLIENT_EMAIL'),
-        "client_id": os.getenv('GOOGLE_CLIENT_ID'),
-        "auth_uri": os.getenv('GOOGLE_AUTH_URI'),
-        "token_uri": os.getenv('GOOGLE_TOKEN_URI'),
-        "auth_provider_x509_cert_url": os.getenv('GOOGLE_AUTH_PROVIDER_CERT_URL'),
-        "client_x509_cert_url": os.getenv('GOOGLE_CLIENT_CERT_URL')
-    }
-
-    # Maak de credentials van de service account info
+    service_account_info = json.loads(os.getenv('GOOGLE_CREDENTIALS_JSON'))
     credentials = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
-
     return credentials
 
-# Functie om een Google Calendar event te maken
+# Function to create a Google Calendar event
 def create_google_calendar_event(start_datetime, end_datetime, summary, timezone="Europe/Amsterdam"):
     credentials = get_credentials()
     service = build('calendar', 'v3', credentials=credentials)
@@ -46,7 +32,7 @@ def create_google_calendar_event(start_datetime, end_datetime, summary, timezone
     event_result = service.events().insert(calendarId='primary', body=event).execute()
     print(f"Event created: {event_result['htmlLink']}")
 
-# Functie om een afspraak te plannen op basis van een JSON payload
+# Function to schedule an appointment from JSON payload
 def schedule_appointment_from_json(json_payload):
     data = json.loads(json_payload)
 
@@ -57,7 +43,7 @@ def schedule_appointment_from_json(json_payload):
 
     create_google_calendar_event(start_datetime, end_datetime, summary, timezone)
 
-# Voorbeeld JSON-data voor een afspraak
+# Example JSON data to schedule an event
 example_json = '''
 {
   "start": {
@@ -72,5 +58,5 @@ example_json = '''
 }
 '''
 
-# Roep de functie aan om de afspraak te plannen
+# Call the function to schedule the appointment
 schedule_appointment_from_json(example_json)
