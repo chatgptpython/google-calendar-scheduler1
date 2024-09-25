@@ -2,7 +2,7 @@ import os
 import json
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
-from flask import Flask
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
@@ -34,7 +34,7 @@ def create_google_calendar_event(start_datetime, end_datetime, summary, timezone
     }
 
     event_result = service.events().insert(calendarId='primary', body=event).execute()
-    print(f"Event created: {event_result['htmlLink']}")
+    return event_result['htmlLink']
 
 # Function to schedule an appointment from JSON payload
 def schedule_appointment_from_json(json_payload):
@@ -45,27 +45,22 @@ def schedule_appointment_from_json(json_payload):
     summary = data['summary']
     timezone = data['start']['timeZone']
 
-    create_google_calendar_event(start_datetime, end_datetime, summary, timezone)
+    return create_google_calendar_event(start_datetime, end_datetime, summary, timezone)
+
+# API route to create a new event
+@app.route('/create_event', methods=['POST'])
+def create_event():
+    try:
+        json_payload = request.get_json()
+        event_link = schedule_appointment_from_json(json.dumps(json_payload))
+        return jsonify({"status": "Event created", "event_link": event_link}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 # Example route to test the Flask app
 @app.route('/')
 def index():
-    # Example JSON data to schedule an event
-    example_json = '''
-    {
-      "start": {
-        "dateTime": "2024-09-26T09:00:00",
-        "timeZone": "Europe/Amsterdam"
-      },
-      "end": {
-        "dateTime": "2024-09-26T09:30:00",
-        "timeZone": "Europe/Amsterdam"
-      },
-      "summary": "Meeting with Max"
-    }
-    '''
-    schedule_appointment_from_json(example_json)
-    return "Event scheduled successfully!"
+    return "Welcome to the Google Calendar Scheduler API!"
 
 if __name__ == '__main__':
     app.run(debug=True)
