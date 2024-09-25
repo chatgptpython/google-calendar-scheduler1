@@ -1,47 +1,31 @@
 import os
 import json
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
+from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 
-# Google Calendar API-scope
+# Google Calendar API scope
 SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 
+# Load credentials from environment variables
 def get_credentials():
-    creds = None
+    # Fetch Google OAuth2 service account credentials from environment variables
+    service_account_info = {
+        "type": os.getenv('GOOGLE_TYPE'),
+        "project_id": os.getenv('GOOGLE_PROJECT_ID'),
+        "private_key_id": os.getenv('GOOGLE_PRIVATE_KEY_ID'),
+        "private_key": os.getenv('GOOGLE_PRIVATE_KEY').replace('\\n', '\n'),  # Handle newlines
+        "client_email": os.getenv('GOOGLE_CLIENT_EMAIL'),
+        "client_id": os.getenv('GOOGLE_CLIENT_ID'),
+        "auth_uri": os.getenv('GOOGLE_AUTH_URI'),
+        "token_uri": os.getenv('GOOGLE_TOKEN_URI'),
+        "auth_provider_x509_cert_url": os.getenv('GOOGLE_AUTH_PROVIDER_CERT_URL'),
+        "client_x509_cert_url": os.getenv('GOOGLE_CLIENT_CERT_URL')
+    }
 
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            # Load environment variables for Google OAuth2 credentials
-            client_id = os.getenv('CLIENT_ID')
-            client_secret = os.getenv('CLIENT_SECRET')
-            redirect_uri = os.getenv('REDIRECT_URI')
-            auth_uri = os.getenv('AUTH_URI')
-            token_uri = os.getenv('TOKEN_URI')
+    # Create credentials object from the service account info
+    credentials = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
 
-            flow = InstalledAppFlow.from_client_config({
-                "installed": {
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "auth_uri": auth_uri,
-                    "token_uri": token_uri,
-                    "redirect_uris": [redirect_uri]
-                }
-            }, SCOPES)
-
-            creds = flow.run_local_server(port=0)
-        
-        # Save the credentials for future use
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
-    
-    return creds
+    return credentials
 
 # Function to create a Google Calendar event
 def create_google_calendar_event(start_datetime, end_datetime, summary, timezone="Europe/Amsterdam"):
@@ -63,7 +47,7 @@ def create_google_calendar_event(start_datetime, end_datetime, summary, timezone
     event_result = service.events().insert(calendarId='primary', body=event).execute()
     print(f"Event created: {event_result['htmlLink']}")
 
-# Function to schedule an appointment from JSON
+# Function to schedule an appointment from JSON payload
 def schedule_appointment_from_json(json_payload):
     data = json.loads(json_payload)
 
@@ -74,7 +58,7 @@ def schedule_appointment_from_json(json_payload):
 
     create_google_calendar_event(start_datetime, end_datetime, summary, timezone)
 
-# Example JSON data
+# Example JSON data to schedule an event
 example_json = '''
 {
   "start": {
