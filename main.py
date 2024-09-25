@@ -1,59 +1,32 @@
 import os
 import json
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.oauth2.credentials import Credentials
+from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
-from google.auth.transport.requests import Request
 
 # Google Calendar API scope
 SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 
-# Function to get credentials using the OAuth2 flow (offline method)
+# Functie om de service account credentials te laden vanuit omgevingsvariabelen
 def get_credentials():
-    creds = None
-    token_file = 'token.json'
-    
-    # Check if we have previously saved credentials
-    if os.path.exists(token_file):
-        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
-    
-    # If credentials are invalid or don't exist, start the OAuth2 flow
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            # Initialize OAuth2 flow with client info from environment variables
-            flow = InstalledAppFlow.from_client_config({
-                "web": {
-                    "client_id": os.getenv('CLIENT_ID'),
-                    "project_id": os.getenv('PROJECT_ID'),
-                    "auth_uri": os.getenv('AUTH_URI'),
-                    "token_uri": os.getenv('TOKEN_URI'),
-                    "auth_provider_x509_cert_url": os.getenv('AUTH_PROVIDER_X509_CERT_URL'),
-                    "client_secret": os.getenv('CLIENT_SECRET')
-                }
-            }, SCOPES)
+    service_account_info = {
+        "type": os.getenv('GOOGLE_TYPE'),
+        "project_id": os.getenv('GOOGLE_PROJECT_ID'),
+        "private_key_id": os.getenv('GOOGLE_PRIVATE_KEY_ID'),
+        "private_key": os.getenv('GOOGLE_PRIVATE_KEY').replace('\\n', '\n'),
+        "client_email": os.getenv('GOOGLE_CLIENT_EMAIL'),
+        "client_id": os.getenv('GOOGLE_CLIENT_ID'),
+        "auth_uri": os.getenv('GOOGLE_AUTH_URI'),
+        "token_uri": os.getenv('GOOGLE_TOKEN_URI'),
+        "auth_provider_x509_cert_url": os.getenv('GOOGLE_AUTH_PROVIDER_CERT_URL'),
+        "client_x509_cert_url": os.getenv('GOOGLE_CLIENT_CERT_URL')
+    }
 
-            # Generate the authorization URL for the user to complete the flow
-            auth_url, _ = flow.authorization_url(prompt='consent')
-            
-            # Output the URL for the user to manually complete the authorization
-            print(f'Please go to this URL and authorize access: {auth_url}')
-            
-            # Get the authorization code from the user
-            auth_code = input('Enter the authorization code: ')
+    # Maak de credentials van de service account info
+    credentials = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
 
-            # Fetch the credentials using the authorization code
-            flow.fetch_token(code=auth_code)
-            creds = flow.credentials
-        
-        # Save the credentials for the next run
-        with open(token_file, 'w') as token:
-            token.write(creds.to_json())
-    
-    return creds
+    return credentials
 
-# Function to create a Google Calendar event
+# Functie om een Google Calendar event te maken
 def create_google_calendar_event(start_datetime, end_datetime, summary, timezone="Europe/Amsterdam"):
     credentials = get_credentials()
     service = build('calendar', 'v3', credentials=credentials)
@@ -73,7 +46,7 @@ def create_google_calendar_event(start_datetime, end_datetime, summary, timezone
     event_result = service.events().insert(calendarId='primary', body=event).execute()
     print(f"Event created: {event_result['htmlLink']}")
 
-# Function to schedule an appointment from JSON payload
+# Functie om een afspraak te plannen op basis van een JSON payload
 def schedule_appointment_from_json(json_payload):
     data = json.loads(json_payload)
 
@@ -84,7 +57,7 @@ def schedule_appointment_from_json(json_payload):
 
     create_google_calendar_event(start_datetime, end_datetime, summary, timezone)
 
-# Example JSON data to schedule an event
+# Voorbeeld JSON-data voor een afspraak
 example_json = '''
 {
   "start": {
@@ -99,5 +72,5 @@ example_json = '''
 }
 '''
 
-# Call the function to schedule the appointment
+# Roep de functie aan om de afspraak te plannen
 schedule_appointment_from_json(example_json)
