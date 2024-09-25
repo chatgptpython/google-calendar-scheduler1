@@ -5,20 +5,15 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
+from flask import Flask, request, jsonify
+
+# Flask app maken
+app = Flask(__name__)
 
 # Google Calendar API-scope
 SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 
-# Haal de environment variables op
-CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
-AUTH_URI = os.getenv("GOOGLE_AUTH_URI")
-TOKEN_URI = os.getenv("GOOGLE_TOKEN_URI")
-AUTH_PROVIDER_CERT_URL = os.getenv("GOOGLE_AUTH_PROVIDER_CERT_URL")
-REDIRECT_URIS = [os.getenv("GOOGLE_REDIRECT_URIS")]
-
-# Maak het credentials object aan op basis van environment variables
+# Laad de client secret JSON van omgevingsvariabelen
 def get_credentials():
     creds = None
     if os.path.exists('token.json'):
@@ -27,25 +22,13 @@ def get_credentials():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            # OAuth flow instellen met environment variables
-            flow = InstalledAppFlow.from_client_config({
-                "installed": {
-                    "client_id": CLIENT_ID,
-                    "client_secret": CLIENT_SECRET,
-                    "project_id": PROJECT_ID,
-                    "auth_uri": AUTH_URI,
-                    "token_uri": TOKEN_URI,
-                    "auth_provider_x509_cert_url": AUTH_PROVIDER_CERT_URL,
-                    "redirect_uris": REDIRECT_URIS
-                }
-            }, SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file('client_secret.json', SCOPES)
             creds = flow.run_local_server(port=0)
-        # Sla de credentials op in 'token.json'
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
     return creds
 
-# Functie om een afspraak in Google Calendar in te plannen
+# Functie om een afspraak in te plannen
 def create_google_calendar_event(start_datetime, end_datetime, summary, timezone="Europe/Amsterdam"):
     credentials = get_credentials()
     service = build('calendar', 'v3', credentials=credentials)
@@ -63,33 +46,25 @@ def create_google_calendar_event(start_datetime, end_datetime, summary, timezone
     }
 
     event_result = service.events().insert(calendarId='primary', body=event).execute()
-    print(f"Event created: {event_result['htmlLink']}")
+    return event_result['htmlLink']
 
-# Functie om JSON-gegevens te verwerken en de afspraak in te plannen
-def schedule_appointment_from_json(json_payload):
-    data = json.loads(json_payload)
+# Endpoint om JSON-gegevens te verwerken en de afspraak te plannen
+@app.route('/schedule', methods=['POST'])
+def schedule_appointment_from_json():
+    data = request.get_json()
 
     start_datetime = data['start']['dateTime']
     end_datetime = data['end']['dateTime']
     summary = data['summary']
-    timezone = data['start']['timeZone']  # Gebruik dezelfde tijdzone voor start en eind
+    timezone = data['start']['timeZone']
 
-    create_google_calendar_event(start_datetime, end_datetime, summary, timezone)
+    event_link = create_google_calendar_event(start_datetime, end_datetime, summary, timezone)
+    return jsonify({"message": "Event created successfully", "event_link": event_link})
 
-# Voorbeeld-JSON-data
-example_json = '''
-{
-  "start": {
-    "dateTime": "2024-09-26T09:00:00",
-    "timeZone": "Europe/Amsterdam"
-  },
-  "end": {
-    "dateTime": "2024-09-26T09:30:00",
-    "timeZone": "Europe/Amsterdam"
-  },
-  "summary": "Mesten"
-}
-'''
+# Start de app
+@app.route('/')
+def home():
+    return "Google Calendar Scheduling Assistant is running"
 
-# Voer de functie uit om de afspraak in te plannen
-schedule_appointment_from_json(example_json)
+if __name__ == '__main__':
+    app.run(debug=True)
