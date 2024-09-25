@@ -2,17 +2,17 @@ import os
 import json
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
+from flask import Flask
+
+app = Flask(__name__)
 
 # Google Calendar API scope
 SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 
-# Load credentials from the secret file
+# Load credentials from the environment variable
 def get_credentials():
-    secret_file_path = '/etc/secrets/google-credentials.json'  # Dit pad komt overeen met de naam die je in het Secret Files paneel hebt gegeven.
-    
-    with open(secret_file_path, 'r') as f:
+    with open('/etc/secrets/google-credentials.json') as f:
         service_account_info = json.load(f)
-    
     credentials = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
     return credentials
 
@@ -47,20 +47,25 @@ def schedule_appointment_from_json(json_payload):
 
     create_google_calendar_event(start_datetime, end_datetime, summary, timezone)
 
-# Example JSON data to schedule an event
-example_json = '''
-{
-  "start": {
-    "dateTime": "2024-09-26T09:00:00",
-    "timeZone": "Europe/Amsterdam"
-  },
-  "end": {
-    "dateTime": "2024-09-26T09:30:00",
-    "timeZone": "Europe/Amsterdam"
-  },
-  "summary": "Meeting with Max"
-}
-'''
+# Example route to test the Flask app
+@app.route('/')
+def index():
+    # Example JSON data to schedule an event
+    example_json = '''
+    {
+      "start": {
+        "dateTime": "2024-09-26T09:00:00",
+        "timeZone": "Europe/Amsterdam"
+      },
+      "end": {
+        "dateTime": "2024-09-26T09:30:00",
+        "timeZone": "Europe/Amsterdam"
+      },
+      "summary": "Meeting with Max"
+    }
+    '''
+    schedule_appointment_from_json(example_json)
+    return "Event scheduled successfully!"
 
-# Call the function to schedule the appointment
-schedule_appointment_from_json(example_json)
+if __name__ == '__main__':
+    app.run(debug=True)
