@@ -8,7 +8,7 @@ from google.auth.transport.requests import Request
 # Google Calendar API scope
 SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 
-# Function to get credentials from OAuth2 flow
+# Function to get credentials using the OAuth2 flow (offline method)
 def get_credentials():
     creds = None
     token_file = 'token.json'
@@ -33,9 +33,19 @@ def get_credentials():
                     "client_secret": os.getenv('CLIENT_SECRET')
                 }
             }, SCOPES)
+
+            # Generate the authorization URL for the user to complete the flow
+            auth_url, _ = flow.authorization_url(prompt='consent')
             
-            # Run local server to get the authorization token
-            creds = flow.run_local_server(port=0)
+            # Output the URL for the user to manually complete the authorization
+            print(f'Please go to this URL and authorize access: {auth_url}')
+            
+            # Get the authorization code from the user
+            auth_code = input('Enter the authorization code: ')
+
+            # Fetch the credentials using the authorization code
+            flow.fetch_token(code=auth_code)
+            creds = flow.credentials
         
         # Save the credentials for the next run
         with open(token_file, 'w') as token:
