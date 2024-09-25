@@ -6,9 +6,13 @@ from googleapiclient.discovery import build
 # Google Calendar API scope
 SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 
-# Load credentials from the environment variable
+# Load credentials from the secret file
 def get_credentials():
-    service_account_info = json.loads(os.getenv('GOOGLE_CREDENTIALS_JSON'))
+    secret_file_path = '/etc/secrets/google-credentials.json'  # Dit pad komt overeen met de naam die je in het Secret Files paneel hebt gegeven.
+    
+    with open(secret_file_path, 'r') as f:
+        service_account_info = json.load(f)
+    
     credentials = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
     return credentials
 
