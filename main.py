@@ -1,70 +1,87 @@
-import datetime
-import json
 import os
+import requests
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
-from flask import Flask, request, jsonify
+from flask import Flask, request, redirect, session, url_for
 
-# Flask app maken
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "a_random_secret_key")
 
-# Google Calendar API-scope
 SCOPES = ['https://www.googleapis.com/auth/calendar.events']
+REDIRECT_URI = "https://jouw-redirect-url.com/callback"  # Pas dit aan naar jouw URL
 
-# Laad de client secret JSON van omgevingsvariabelen
-def get_credentials():
-    creds = None
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file('client_secret.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
-    return creds
+# Start OAuth autorisatieproces
+@app.route('/authorize')
+def authorize():
+    flow = Flow.from_client_secrets_file(
+        'client_secret.json',
+        scopes=SCOPES,
+        redirect_uri=REDIRECT_URI
+    )
+    
+    authorization_url, state = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true'
+    )
 
-# Functie om een afspraak in te plannen
-def create_google_calendar_event(start_datetime, end_datetime, summary, timezone="Europe/Amsterdam"):
-    credentials = get_credentials()
+    session['state'] = state
+    return redirect(authorization_url)
+
+# OAuth callback endpoint
+@app.route('/callback')
+def oauth2callback():
+    state = session['state']
+    
+    flow = Flow.from_client_secrets_file(
+        'client_secret.json',
+        scopes=SCOPES,
+        state=state,
+        redirect_uri=REDIRECT_URI
+    )
+
+    authorization_response = request.url
+    flow.fetch_token(authorization_response=authorization_response)
+
+    credentials = flow.credentials
+    session['credentials'] = credentials_to_dict(credentials)
+
+    return redirect(url_for('calendar_event'))
+
+# Functie om een Google Calendar event in te plannen
+@app.route('/calendar_event')
+def calendar_event():
+    if 'credentials' not in session:
+        return redirect('authorize')
+
+    credentials = Credentials(**session['credentials'])
     service = build('calendar', 'v3', credentials=credentials)
 
     event = {
-        'summary': summary,
+        'summary': 'Test Event',
         'start': {
-            'dateTime': start_datetime,
-            'timeZone': timezone,
+            'dateTime': '2024-09-26T09:00:00',
+            'timeZone': 'Europe/Amsterdam',
         },
         'end': {
-            'dateTime': end_datetime,
-            'timeZone': timezone,
+            'dateTime': '2024-09-26T09:30:00',
+            'timeZone': 'Europe/Amsterdam',
         }
     }
 
     event_result = service.events().insert(calendarId='primary', body=event).execute()
-    return event_result['htmlLink']
 
-# Endpoint om JSON-gegevens te verwerken en de afspraak te plannen
-@app.route('/schedule', methods=['POST'])
-def schedule_appointment_from_json():
-    data = request.get_json()
+    return f"Event created: {event_result.get('htmlLink')}"
 
-    start_datetime = data['start']['dateTime']
-    end_datetime = data['end']['dateTime']
-    summary = data['summary']
-    timezone = data['start']['timeZone']
-
-    event_link = create_google_calendar_event(start_datetime, end_datetime, summary, timezone)
-    return jsonify({"message": "Event created successfully", "event_link": event_link})
-
-# Start de app
-@app.route('/')
-def home():
-    return "Google Calendar Scheduling Assistant is running"
+def credentials_to_dict(credentials):
+    return {
+        'token': credentials.token,
+        'refresh_token': credentials.refresh_token,
+        'token_uri': credentials.token_uri,
+        'client_id': credentials.client_id,
+        'client_secret': credentials.client_secret,
+        'scopes': credentials.scopes
+    }
 
 if __name__ == '__main__':
     app.run(debug=True)
