@@ -51,6 +51,7 @@ def get_or_post_ticket_from_chatbot():
     # Haal het ticket op via de HubSpot API
     ticket_data = get_hubspot_ticket(ticket_id)
 
+    # Verstuur het resultaat terug naar het juiste adres
     return jsonify(ticket_data)
 
 if __name__ == '__main__':
