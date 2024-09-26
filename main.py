@@ -26,9 +26,10 @@ def get_hubspot_ticket(ticket_id):
     else:
         return {"error": f"HubSpot API Error: {response.status_code}"}
 
-# Endpoint om een HubSpot-ticket op te halen via POST en GET
-@app.route('/api/get_ticket_from_chatbot', methods=['POST', 'GET'])
-def get_or_post_ticket_from_chatbot():
+# Endpoint om een HubSpot-ticket op te halen via POST
+@app.route('/api/get_ticket_from_chatbot', methods=['POST'])
+def post_ticket_from_chatbot():
+    # Verifieer de bearer token van de klant
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
         return jsonify({"error": "Geen of ongeldige Authorization header"}), 401
@@ -37,21 +38,14 @@ def get_or_post_ticket_from_chatbot():
     if token != BEARER_TOKEN:
         return jsonify({"error": "Ongeldige bearer token"}), 403
 
-    # Verwerken van GET en POST verzoeken
-    if request.method == 'POST':
-        data = request.json
-        if 'ticket_id' not in data:
-            return jsonify({"error": "Geen ticket ID meegegeven"}), 400
-        ticket_id = data['ticket_id']
-    elif request.method == 'GET':
-        ticket_id = request.args.get('ticket_id')
-        if not ticket_id:
-            return jsonify({"error": "Geen ticket ID meegegeven"}), 400
+    # Verkrijg de JSON data van de request (moet in de body staan, niet in de URL)
+    data = request.json
+    if 'ticket_id' not in data:
+        return jsonify({"error": "Geen ticket ID meegegeven"}), 400
 
-    # Haal het ticket op via de HubSpot API
+    ticket_id = data['ticket_id']
     ticket_data = get_hubspot_ticket(ticket_id)
 
-    # Verstuur het resultaat terug naar het juiste adres
     return jsonify(ticket_data)
 
 if __name__ == '__main__':
