@@ -12,6 +12,10 @@ app = Flask(__name__)
 BEARER_TOKEN = os.getenv("BEARER_TOKEN")
 HUBSPOT_API_TOKEN = os.getenv("HUBSPOT_API_TOKEN")
 
+# Controleer of de HubSpot API-token is geladen
+if not HUBSPOT_API_TOKEN:
+    logging.error("HubSpot API token is niet geladen. Controleer de environment variables.")
+
 # Functie om een specifieke ticket op te halen van HubSpot
 def get_hubspot_ticket(ticket_id):
     logging.debug(f"Opvragen van ticket ID: {ticket_id}")
@@ -20,7 +24,7 @@ def get_hubspot_ticket(ticket_id):
         "properties": ["subject", "content", "created_by", "hs_pipeline", "hs_pipeline_stage"]
     }
     headers = {
-        "Authorization": f"Bearer {HUBSPOT_API_TOKEN}",
+        "Authorization": f"Bearer {HUBSPOT_API_TOKEN}",  # Voeg de token correct toe
         "Content-Type": "application/json"
     }
 
@@ -51,7 +55,7 @@ def post_ticket_from_chatbot():
         logging.error("Ongeldige bearer token")
         return jsonify({"error": "Ongeldige bearer token"}), 403
 
-    # Verkrijg de JSON data van de request (moet in de body staan, niet in de URL)
+    # Verkrijg de JSON data van de request
     data = request.json
     logging.debug(f"Ontvangen JSON data: {data}")
 
@@ -62,6 +66,7 @@ def post_ticket_from_chatbot():
     ticket_id = data['ticket_id']
     logging.debug(f"Verwerken ticket ID: {ticket_id}")
 
+    # Haal het ticket op via de HubSpot API
     ticket_data = get_hubspot_ticket(ticket_id)
 
     logging.debug(f"Terugsturen van ticket data: {ticket_data}")
