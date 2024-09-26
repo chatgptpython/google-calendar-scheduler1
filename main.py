@@ -5,8 +5,8 @@ from flask import Flask, request, jsonify
 app = Flask(__name__)
 
 # Je Calendly OAuth Client gegevens
-client_id = "zVOp_Z-V-xbbdn10ah19meeVFF3dYKnMXWxdRZSfHaA"
-client_secret = "RPnWDrPM633RWowpaTXDrs-bEqTtxQzeuJd13bj95S0"
+client_id = "DSCKFx4aSa5rXgSRstTEkxZvcU96lLCifce1FMH1HY8"  # Nieuwe Client ID
+client_secret = "EClIUPliBmdWcb5szaZ9bLOK2Tzg5fSxbpZScraSgOs"  # Nieuwe Client Secret
 redirect_uri = "https://google-calendar-scheduler1.onrender.com"
 
 # Refresh Token (verkregen via de OAuth flow)
