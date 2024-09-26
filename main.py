@@ -1,3 +1,4 @@
+import os
 import requests
 from flask import Flask, jsonify, request
 import logging
@@ -7,9 +8,13 @@ logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
 
-# Hardcoded API-tokens
-BEARER_TOKEN = "abc123securetoken"
-HUBSPOT_API_TOKEN = "pat-eu1-e3ef60f6-781a-48e5-a548-745353dcdc2d"
+# Haal de Bearer token en HubSpot API token op uit de environment
+BEARER_TOKEN = os.getenv("BEARER_TOKEN")
+HUBSPOT_API_TOKEN = os.getenv("HUBSPOT_API_TOKEN")
+
+# Controleer of de tokens correct zijn opgehaald
+if not BEARER_TOKEN or not HUBSPOT_API_TOKEN:
+    raise ValueError("API-tokens niet gevonden in de omgeving.")
 
 # Functie om een specifieke ticket op te halen van HubSpot
 def get_hubspot_ticket(ticket_id):
