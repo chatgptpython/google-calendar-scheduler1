@@ -1,60 +1,54 @@
-import requests
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request, abort
 
 app = Flask(__name__)
 
-# Je Bearer Token (vervang YOUR_BEARER_TOKEN met je daadwerkelijke token)
-bearer_token = "eyJraWQiOiIxY2UxZTEzNjE3ZGNmNzY2YjNjZWJjY2Y4ZGM1YmFmYThhNjVlNjg0MDIzZjdjMzJiZTgzNDliMjM4MDEzNWI0IiwidHlwIjoiUEFUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiJodHRwczovL2F1dGguY2FsZW5kbHkuY29tIiwiaWF0IjoxNzI3MzYwMjU0LCJqdGkiOiJhYzFjNGQ1Ny0yZjI5LTQ3NjEtOTZkMS0xNGZiM2U3MGE3OGQiLCJ1c2VyX3V1aWQiOiJhYTdiNGZjMC00NTY4LTQzZDktOWMwYy02NDVkYzFkNDE5ZDgifQ.6Vzfjvcw9JnihzB1W8uGaFsmegEjDSgrMS4c4Ph0I8AS-eqYTqB0IGPxiceBS09o0BQbbGkP-d1vGeNQ4N5HcQ"
+# Statische lijst met 10 orders, inclusief verzonnen barcodes
+orders = [
+    {"order_number": "10001", "customer": "John Doe", "barcode": "123456789012"},
+    {"order_number": "10002", "customer": "Jane Smith", "barcode": "234567890123"},
+    {"order_number": "10003", "customer": "Alice Johnson", "barcode": "345678901234"},
+    {"order_number": "10004", "customer": "Bob Brown", "barcode": "456789012345"},
+    {"order_number": "10005", "customer": "Charlie White", "barcode": "567890123456"},
+    {"order_number": "10006", "customer": "Daisy Black", "barcode": "678901234567"},
+    {"order_number": "10007", "customer": "Evan Green", "barcode": "789012345678"},
+    {"order_number": "10008", "customer": "Fiona Blue", "barcode": "890123456789"},
+    {"order_number": "10009", "customer": "George Yellow", "barcode": "901234567890"},
+    {"order_number": "10010", "customer": "Hannah Purple", "barcode": "012345678901"},
+]
 
-# Functie om een afspraak te maken via de Calendly API
-@app.route('/create_event', methods=['POST'])
-def create_event():
-    # Ontvang de JSON-data van de GPT-trainer chatbot
+# Bearer token voor verificatie
+BEARER_TOKEN = "abc123securetoken"
+
+# Functie om bearer token te verifiëren
+def verify_token(token):
+    return token == BEARER_TOKEN
+
+# Endpoint om een specifieke order op te halen via JSON
+@app.route('/api/get_order', methods=['POST'])
+def get_order():
+    # Verifieer de bearer token
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return jsonify({"error": "Geen of ongeldige Authorization header"}), 401
+
+    token = auth_header.split(" ")[1]
+    if not verify_token(token):
+        return jsonify({"error": "Ongeldige bearer token"}), 403
+
+    # Verkrijg de JSON data van de request
     data = request.json
+    if 'order_number' not in data:
+        return jsonify({"error": "Geen ordernummer meegegeven"}), 400
 
-    # Controleer of de benodigde gegevens aanwezig zijn
-    if not all(key in data for key in ['start', 'end', 'summary', 'invitee_email']):
-        return jsonify({"message": "Ontbrekende vereiste velden."}), 400
+    order_number = data['order_number']
 
-    start_time = data['start']['dateTime']
-    end_time = data['end']['dateTime']
-    event_name = data['summary']
-    invitee_email = data['invitee_email']
-    time_zone = data['start']['timeZone']
+    # Zoek naar het ordernummer in de lijst
+    order = next((order for order in orders if order["order_number"] == order_number), None)
 
-    # API URL voor het maken van een afspraak in Calendly
-    calendly_api_url = "https://api.calendly.com/scheduled_events"
-
-    # Gegevens voor de afspraak (payload)
-    event_data = {
-        "start_time": start_time,
-        "end_time": end_time,
-        "name": event_name,
-        "time_zone": time_zone,
-        "invitees": [
-            {
-                "email": invitee_email,
-                "name": "Invitee Name"  # Voeg een standaardnaam toe
-            }
-        ]
-    }
-
-    # Voeg de Bearer Token toe aan de headers
-    headers = {
-        "Authorization": f"Bearer {bearer_token}",
-        "Content-Type": "application/json"
-    }
-
-    # Verstuur het POST-verzoek naar de Calendly API
-    response = requests.post(calendly_api_url, headers=headers, json=event_data)
-
-    if response.status_code == 201:
-        print("Afspraak succesvol ingepland!")
-        return jsonify({"message": "Afspraak succesvol ingepland", "data": response.json()}), 201  # Succesvolle respons terug naar GPT-trainer
+    if order:
+        return jsonify(order)
     else:
-        print(f"Fout bij het inplannen van de afspraak: {response.status_code}")
-        return jsonify({"message": "Fout bij het inplannen van de afspraak", "error": response.text}), 400
+        return jsonify({"error": "Order niet gevonden"}), 404
 
-# De server opstarten
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(debug=True)
