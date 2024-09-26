@@ -19,16 +19,14 @@ if not HUBSPOT_API_TOKEN:
 # Functie om een specifieke ticket op te halen van HubSpot
 def get_hubspot_ticket(ticket_id):
     logging.debug(f"Opvragen van ticket ID: {ticket_id}")
-    url = f"https://api.hubapi.com/crm-objects/v1/objects/tickets/{ticket_id}"
-    params = {
-        "properties": ["subject", "content", "created_by", "hs_pipeline", "hs_pipeline_stage"]
-    }
+    url = f"https://api.hubapi.com/crm-objects/v1/objects/tickets/{ticket_id}?properties=subject&properties=content&properties=created_by"
+    
     headers = {
-        "Authorization": f"Bearer {HUBSPOT_API_TOKEN}",  # Voeg de token correct toe
+        "Authorization": f"Bearer {HUBSPOT_API_TOKEN}",
         "Content-Type": "application/json"
     }
 
-    response = requests.get(url, headers=headers, params=params)
+    response = requests.get(url, headers=headers)
 
     logging.debug(f"HubSpot API Response Code: {response.status_code}")
     logging.debug(f"HubSpot API Response: {response.text}")
