@@ -1,79 +1,50 @@
-from flask import Flask, jsonify, request, abort
+import os
+import requests
+from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-# Statische lijst met 10 orders, inclusief verzonnen barcodes
-orders = [
-    {"order_number": "10001", "customer": "John Doe", "barcode": "123456789012"},
-    {"order_number": "10002", "customer": "Jane Smith", "barcode": "234567890123"},
-    {"order_number": "10003", "customer": "Alice Johnson", "barcode": "345678901234"},
-    {"order_number": "10004", "customer": "Bob Brown", "barcode": "456789012345"},
-    {"order_number": "10005", "customer": "Charlie White", "barcode": "567890123456"},
-    {"order_number": "10006", "customer": "Daisy Black", "barcode": "678901234567"},
-    {"order_number": "10007", "customer": "Evan Green", "barcode": "789012345678"},
-    {"order_number": "10008", "customer": "Fiona Blue", "barcode": "890123456789"},
-    {"order_number": "10009", "customer": "George Yellow", "barcode": "901234567890"},
-    {"order_number": "10010", "customer": "Hannah Purple", "barcode": "012345678901"},
-]
+# Haal de Bearer token en HubSpot API token op uit de environment
+BEARER_TOKEN = os.getenv("BEARER_TOKEN")
+HUBSPOT_API_TOKEN = os.getenv("HUBSPOT_API_TOKEN")
 
-# Bearer token voor verificatie
-BEARER_TOKEN = "abc123securetoken"
+# Functie om een specifieke ticket op te halen van HubSpot
+def get_hubspot_ticket(ticket_id):
+    url = f"https://api.hubapi.com/crm-objects/v1/objects/tickets/{ticket_id}"
+    params = {
+        "properties": ["subject", "content", "created_by", "hs_pipeline", "hs_pipeline_stage"]
+    }
+    headers = {
+        "Authorization": f"Bearer {HUBSPOT_API_TOKEN}",
+        "Content-Type": "application/json"
+    }
 
-# Functie om bearer token te verifiëren
-def verify_token(token):
-    return token == BEARER_TOKEN
+    response = requests.get(url, headers=headers, params=params)
 
-# Endpoint om een specifieke order op te halen via POST
-@app.route('/api/get_order', methods=['POST'])
-def get_order_post():
-    # Verifieer de bearer token
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return {"error": f"HubSpot API Error: {response.status_code}"}
+
+# Endpoint om een HubSpot-ticket op te halen via POST
+@app.route('/api/get_ticket_from_chatbot', methods=['POST'])
+def post_ticket_from_chatbot():
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
         return jsonify({"error": "Geen of ongeldige Authorization header"}), 401
 
     token = auth_header.split(" ")[1]
-    if not verify_token(token):
+    if token != BEARER_TOKEN:
         return jsonify({"error": "Ongeldige bearer token"}), 403
 
-    # Verkrijg de JSON data van de request
     data = request.json
-    if 'order_number' not in data:
-        return jsonify({"error": "Geen ordernummer meegegeven"}), 400
+    if 'ticket_id' not in data:
+        return jsonify({"error": "Geen ticket ID meegegeven"}), 400
 
-    order_number = data['order_number']
+    ticket_id = data['ticket_id']
+    ticket_data = get_hubspot_ticket(ticket_id)
 
-    # Zoek naar het ordernummer in de lijst
-    order = next((order for order in orders if order["order_number"] == order_number), None)
-
-    if order:
-        return jsonify(order)
-    else:
-        return jsonify({"error": "Order niet gevonden"}), 404
-
-# Endpoint om een specifieke order op te halen via GET met query parameters
-@app.route('/api/order_tracker', methods=['GET'])
-def get_order_get():
-    # Verifieer de bearer token
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith('Bearer '):
-        return jsonify({"error": "Geen of ongeldige Authorization header"}), 401
-
-    token = auth_header.split(" ")[1]
-    if not verify_token(token):
-        return jsonify({"error": "Ongeldige bearer token"}), 403
-
-    # Haal het ordernummer op uit de query string
-    order_number = request.args.get('order_number')
-    if not order_number:
-        return jsonify({"error": "Geen ordernummer meegegeven"}), 400
-
-    # Zoek naar het ordernummer in de lijst
-    order = next((order for order in orders if order["order_number"] == order_number), None)
-
-    if order:
-        return jsonify(order)
-    else:
-        return jsonify({"error": "Order niet gevonden"}), 404
+    return jsonify(ticket_data)
 
 if __name__ == '__main__':
     app.run(debug=True)
