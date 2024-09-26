@@ -11,6 +11,11 @@ bearer_token = "eyJraWQiOiIxY2UxZTEzNjE3ZGNmNzY2YjNjZWJjY2Y4ZGM1YmFmYThhNjVlNjg0
 def create_event():
     # Ontvang de JSON-data van de GPT-trainer chatbot
     data = request.json
+
+    # Controleer of de benodigde gegevens aanwezig zijn
+    if not all(key in data for key in ['start', 'end', 'summary', 'invitee_email']):
+        return jsonify({"message": "Ontbrekende vereiste velden."}), 400
+
     start_time = data['start']['dateTime']
     end_time = data['end']['dateTime']
     event_name = data['summary']
